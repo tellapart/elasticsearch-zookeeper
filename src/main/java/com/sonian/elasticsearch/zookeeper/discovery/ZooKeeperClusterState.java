@@ -33,6 +33,7 @@ import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.discovery.zen.DiscoveryNodesProvider;
+import org.elasticsearch.discovery.zen.publish.PublishClusterStateAction;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -118,7 +119,7 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
      * @throws ElasticSearchException
      * @throws InterruptedException
      */
-    public ClusterState retrieve(final NewClusterStateListener newClusterStateListener) throws ElasticSearchException, InterruptedException {
+    public ClusterState retrieve(final PublishClusterStateAction.NewClusterStateListener newClusterStateListener) throws ElasticSearchException, InterruptedException {
         publishingLock.lock();
         try {
             if (!lifecycle.started()) {
@@ -161,7 +162,7 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
                 throw new ZooKeeperIncompatibleStateVersionException("Expected: " + clusterStateVersion() + ", actual: " + clusterStateVersion);
             }
 
-            ClusterState.Builder builder = ClusterState.newClusterStateBuilder()
+            ClusterState.Builder builder = ClusterState.builder()
                     .version(buf.readLong());
             for (ClusterStatePart<?> part : this.parts) {
                 builder = part.set(builder, buf.readString());
@@ -200,16 +201,26 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
         for (String part : parts) {
             // Don't delete the part node itself. Other nodes might already have watchers set on this node
             if (!"parts".equals(part)) {
-                 zooKeeperClient.deleteNodeRecursively(environment.stateNodePath() + "/" + part);
+                zooKeeperClient.deleteNodeRecursively(environment.stateNodePath() + "/" + part);
             }
         }
     }
 
-    private void updateClusterState(NewClusterStateListener newClusterStateListener) {
+    private void updateClusterState(PublishClusterStateAction.NewClusterStateListener newClusterStateListener) {
         try {
             ClusterState clusterState = retrieve(newClusterStateListener);
             if (clusterState != null) {
-                newClusterStateListener.onNewClusterState(clusterState);
+                newClusterStateListener.onNewClusterState(clusterState, new PublishClusterStateAction.NewClusterStateListener.NewStateProcessed() {
+                    @Override
+                    public void onNewClusterStateProcessed() {
+                        // ignore
+                    }
+
+                    @Override
+                    public void onNewClusterStateFailed(Throwable t) {
+                        // ignore
+                    }
+                });
             }
         } catch (ZooKeeperClientSessionExpiredException ex) {
             // Ignore session should be restarted
@@ -234,10 +245,6 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
         return clusterStateVersion;
     }
 
-
-    public interface NewClusterStateListener {
-        public void onNewClusterState(ClusterState clusterState);
-    }
 
     // TODO: this logic should be moved to the actual classes that represent parts of Cluster State after zookeeper-
     // based discovery is merged to master.

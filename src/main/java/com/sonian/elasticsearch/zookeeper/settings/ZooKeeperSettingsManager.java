@@ -18,6 +18,8 @@
 package com.sonian.elasticsearch.zookeeper.settings;
 
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperClientService;
+import com.sonian.elasticsearch.zookeeper.client.ZooKeeperEnvironment;
+import com.sonian.elasticsearch.zookeeper.client.ZooKeeperFactory;
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.cluster.ClusterName;
 import org.elasticsearch.common.Classes;
@@ -30,10 +32,8 @@ import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.settings.loader.SettingsLoader;
 import org.elasticsearch.common.settings.loader.SettingsLoaderFactory;
-import com.sonian.elasticsearch.zookeeper.client.ZooKeeperEnvironment;
-import com.sonian.elasticsearch.zookeeper.client.ZooKeeperFactory;
 import org.elasticsearch.env.Environment;
-import org.elasticsearch.node.internal.InternalSettingsPerparer;
+import org.elasticsearch.node.internal.InternalSettingsPreparer;
 
 import java.io.File;
 import java.io.IOException;
@@ -178,9 +178,9 @@ public final class ZooKeeperSettingsManager extends AbstractLifecycleComponent<Z
             return;
         }
 
-        Tuple<Settings, Environment> initialSettings = InternalSettingsPerparer.prepareSettings(EMPTY_SETTINGS, true);
+        Tuple<Settings, Environment> initialSettings = InternalSettingsPreparer.prepareSettings(EMPTY_SETTINGS, true);
 
-        Settings settings = InternalSettingsPerparer.prepareSettings(initialSettings.v1(), true).v1();
+        Settings settings = InternalSettingsPreparer.prepareSettings(initialSettings.v1(), true).v1();
 
         setupLogging(settings);
         Loggers.disableConsoleLogging();
@@ -195,9 +195,9 @@ public final class ZooKeeperSettingsManager extends AbstractLifecycleComponent<Z
         } else if (args[0].equals("get") || args[0].equals("get-global")) {
             byte[] loadedSettings = loadSettings(settings, args[0].equals("get-global"));
             if (loadedSettings != null) {
-                try{
-                System.out.write(loadedSettings);
-                }catch (IOException ex) {
+                try {
+                    System.out.write(loadedSettings);
+                } catch (IOException ex) {
                     // Ignore
                 }
             }

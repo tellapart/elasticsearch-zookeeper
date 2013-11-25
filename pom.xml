@@ -30,16 +30,16 @@
     </parent>
 
     <properties>
-        <elasticsearch.version>0.90.0</elasticsearch.version>
+        <elasticsearch.version>0.90.7</elasticsearch.version>
         <zookeeper.version>3.3.6</zookeeper.version>
     </properties>
 
     <repositories>
-      <repository>
-        <id>sonatype</id>
-        <name>elasticsearch sonatype repo</name>
-        <url>https://oss.sonatype.org/content/repositories/releases</url>
-      </repository>
+        <repository>
+            <id>sonatype</id>
+            <name>elasticsearch sonatype repo</name>
+            <url>https://oss.sonatype.org/content/repositories/releases</url>
+        </repository>
     </repositories>
 
     <dependencies>

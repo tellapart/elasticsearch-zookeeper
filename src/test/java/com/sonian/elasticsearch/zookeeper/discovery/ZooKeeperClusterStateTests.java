@@ -20,8 +20,9 @@ import com.sonian.elasticsearch.zookeeper.client.ZooKeeperClient;
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperIncompatibleStateVersionException;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
-import org.elasticsearch.cluster.routing.*;
+import org.elasticsearch.cluster.routing.RoutingTable;
 import org.elasticsearch.common.settings.ImmutableSettings;
+import org.elasticsearch.discovery.zen.publish.PublishClusterStateAction;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -64,10 +65,10 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
 
         final CountDownLatch latch = new CountDownLatch(1);
 
-        ClusterState retrievedState = zkState.retrieve(new ZooKeeperClusterState.NewClusterStateListener() {
+        ClusterState retrievedState = zkState.retrieve(new PublishClusterStateAction.NewClusterStateListener() {
 
             @Override
-            public void onNewClusterState(ClusterState clusterState) {
+            public void onNewClusterState(ClusterState clusterState, NewStateProcessed newStateProcessed) {
                 latch.countDown();
             }
         });
@@ -75,8 +76,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
         assertThat(ClusterState.Builder.toBytes(retrievedState),
                 equalTo(ClusterState.Builder.toBytes(initialState)));
 
-        ClusterState secondVersion = ClusterState.newClusterStateBuilder()
-                .state(initialState)
+        ClusterState secondVersion = ClusterState.builder(initialState)
                 .version(1235L)
                 .build();
 
