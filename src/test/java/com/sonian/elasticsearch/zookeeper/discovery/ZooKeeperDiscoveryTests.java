@@ -236,7 +236,7 @@ public class ZooKeeperDiscoveryTests extends AbstractZooKeeperNodeTests {
         ClusterState initialState = testClusterState(routingTable, nodes);
         ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, "0.0.1");
         zkStateOld.start();
-        zkStateOld.publish(initialState);
+        zkStateOld.publish(initialState, new NoOpAckListener());
         zkStateOld.stop();
 
         // Create a client node

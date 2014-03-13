@@ -32,6 +32,7 @@ import org.elasticsearch.common.io.stream.BytesStreamOutput;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.discovery.Discovery;
 import org.elasticsearch.discovery.zen.DiscoveryNodesProvider;
 
 import java.io.IOException;
@@ -83,7 +84,13 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
      *
      * @throws InterruptedException
      */
-    public void publish(ClusterState state) throws ElasticSearchException, InterruptedException {
+    public void publish(ClusterState state, Discovery.AckListener ackListener) throws ElasticSearchException, InterruptedException {
+        // TODO: Add ack logic
+        publish(state/*, new AckClusterStatePublishResponseHandler(state.nodes().size() - 1, ackListener)*/ );
+        ackListener.onTimeout();
+    }
+
+    private void publish(ClusterState state/*, final ClusterStatePublishResponseHandler publishResponseHandler*/) throws ElasticSearchException, InterruptedException {
         publishingLock.lock();
         try {
             logger.trace("Publishing new cluster state version [{}]", state.version());
