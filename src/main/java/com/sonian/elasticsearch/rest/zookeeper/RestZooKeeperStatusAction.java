@@ -27,10 +27,9 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.rest.*;
+import org.elasticsearch.rest.action.support.RestBuilderListener;
 
 import java.io.IOException;
-
-import static org.elasticsearch.rest.action.support.RestXContentBuilder.restContentBuilder;
 
 /**
  */
@@ -51,42 +50,24 @@ public class RestZooKeeperStatusAction extends BaseRestHandler {
         String[] nodesIds = Strings.splitStringByCommaToArray(request.param("nodeId"));
         NodesZooKeeperStatusRequest zooKeeperStatusRequest = new NodesZooKeeperStatusRequest(nodesIds);
         zooKeeperStatusRequest.zooKeeperTimeout(request.paramAsTime("timeout", TimeValue.timeValueSeconds(10)));
-        transportNodesZooKeeperStatusAction.execute(zooKeeperStatusRequest, new ActionListener<NodesZooKeeperStatusResponse>() {
+        transportNodesZooKeeperStatusAction.execute(zooKeeperStatusRequest, new RestBuilderListener<NodesZooKeeperStatusResponse>(channel) {
             @Override
-            public void onResponse(NodesZooKeeperStatusResponse result) {
-                try {
-                    XContentBuilder builder = restContentBuilder(request);
-                    builder.startObject();
-                    builder.field("cluster_name", result.getClusterNameAsString());
+            public RestResponse buildResponse(NodesZooKeeperStatusResponse result, XContentBuilder builder) throws Exception {
+                builder.startObject();
+                builder.field("cluster_name", result.getClusterNameAsString());
 
-                    builder.startObject("nodes");
-                    for (NodesZooKeeperStatusResponse.NodeZooKeeperStatusResponse nodeInfo : result) {
-                        builder.startObject(nodeInfo.getNode().id());
-                        builder.field("name", nodeInfo.getNode().name());
-                        builder.field("enabled", nodeInfo.enabled());
-                        builder.field("connected", nodeInfo.connected());
-                        builder.endObject();
-                    }
-                    builder.endObject();
-
-                    builder.endObject();
-                    channel.sendResponse(new XContentRestResponse(request, RestStatus.OK, builder));
-                } catch (Exception ex) {
-                    try {
-                        channel.sendResponse(new XContentThrowableRestResponse(request, ex));
-                    } catch (IOException e) {
-                        logger.warn("Error sending zookeeper status", e);
-                    }
+                builder.startObject("nodes");
+                for (NodesZooKeeperStatusResponse.NodeZooKeeperStatusResponse nodeInfo : result) {
+                  builder.startObject(nodeInfo.getNode().id());
+                  builder.field("name", nodeInfo.getNode().name());
+                  builder.field("enabled", nodeInfo.enabled());
+                  builder.field("connected", nodeInfo.connected());
+                  builder.endObject();
                 }
-            }
+                builder.endObject();
 
-            @Override
-            public void onFailure(Throwable e) {
-                try {
-                    channel.sendResponse(new XContentThrowableRestResponse(request, e));
-                } catch (IOException e1) {
-                    logger.error("Failed to send failure response", e1);
-                }
+                builder.endObject();
+                return new BytesRestResponse(RestStatus.OK, builder);
             }
         });
     }
