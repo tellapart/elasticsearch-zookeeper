@@ -175,7 +175,7 @@ public abstract class AbstractZooKeeperTests {
 
 
     protected ClusterState testClusterState(RoutingTable routingTable, DiscoveryNodes nodes) {
-        return ClusterState.builder()
+        return ClusterState.builder(ClusterName.clusterNameFromSettings(defaultSettings))
                 .version(1234L)
                 .routingTable(routingTable)
                 .nodes(nodes)
@@ -232,7 +232,8 @@ public abstract class AbstractZooKeeperTests {
             return new ZooKeeperClusterState(defaultSettings(),
                     zooKeeperEnvironment(),
                     zk,
-                    provider
+                    provider,
+                    ClusterName.clusterNameFromSettings(defaultSettings)
             );
         }
     }
@@ -244,7 +245,7 @@ public abstract class AbstractZooKeeperTests {
         public ZooKeeperClusterStateVersionOverride(String clusterStateVersion, Settings settings,
                                                     ZooKeeperEnvironment environment, ZooKeeperClient zooKeeperClient,
                                                     DiscoveryNodesProvider nodesProvider) {
-            super(settings, environment, zooKeeperClient, nodesProvider);
+            super(settings, environment, zooKeeperClient, nodesProvider, ClusterName.clusterNameFromSettings(defaultSettings));
             this.clusterStateVersion = clusterStateVersion;
         }
 

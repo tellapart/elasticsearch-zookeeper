@@ -20,6 +20,7 @@ package com.sonian.elasticsearch.zookeeper.discovery;
 import com.sonian.elasticsearch.zookeeper.client.*;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.Version;
+import org.elasticsearch.cluster.ClusterName;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.block.ClusterBlocks;
 import org.elasticsearch.cluster.metadata.MetaData;
@@ -62,15 +63,18 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
 
     private final DiscoveryNodesProvider nodesProvider;
 
+    private final ClusterName clusterName;
+
     private final String clusterStateVersion = Version.CURRENT.number();
 
     private volatile boolean watching = true;
 
-    public ZooKeeperClusterState(Settings settings, ZooKeeperEnvironment environment, ZooKeeperClient zooKeeperClient, DiscoveryNodesProvider nodesProvider) {
+    public ZooKeeperClusterState(Settings settings, ZooKeeperEnvironment environment, ZooKeeperClient zooKeeperClient, DiscoveryNodesProvider nodesProvider, ClusterName clusterName) {
         super(settings);
         this.zooKeeperClient = zooKeeperClient;
         this.environment = environment;
         this.nodesProvider = nodesProvider;
+        this.clusterName = clusterName;
         initClusterStatePersistence();
     }
 
@@ -167,7 +171,7 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
                 throw new ZooKeeperIncompatibleStateVersionException("Expected: " + clusterStateVersion() + ", actual: " + clusterStateVersion);
             }
 
-            ClusterState.Builder builder = ClusterState.builder().version(buf.readLong());
+            ClusterState.Builder builder = ClusterState.builder(clusterName).version(buf.readLong());
             for (ClusterStatePart<?> part : this.parts) {
                 builder = part.set(builder, buf.readString());
                 if (builder == null) {

@@ -656,7 +656,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         private final ZooKeeperClusterState zooKeeperClusterState;
 
         public ZooKeeperStatePublisher(Settings settings, ZooKeeperEnvironment environment, ZooKeeperClient zooKeeperClient, DiscoveryNodesProvider nodesProvider) {
-            zooKeeperClusterState = new ZooKeeperClusterState(settings, environment, zooKeeperClient, nodesProvider);
+            zooKeeperClusterState = new ZooKeeperClusterState(settings, environment, zooKeeperClient, nodesProvider, clusterName);
 
         }
 
