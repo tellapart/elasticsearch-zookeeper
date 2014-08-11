@@ -22,12 +22,14 @@ import org.elasticsearch.cluster.ClusterName;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
+import org.elasticsearch.common.xcontent.ToXContent;
+import org.elasticsearch.common.xcontent.XContentBuilder;
 
 import java.io.IOException;
 
 /**
  */
-public class NodesZooKeeperStatusResponse extends NodesOperationResponse<NodesZooKeeperStatusResponse.NodeZooKeeperStatusResponse> {
+public class NodesZooKeeperStatusResponse extends NodesOperationResponse<NodesZooKeeperStatusResponse.NodeZooKeeperStatusResponse> implements ToXContent {
 
 
     public NodesZooKeeperStatusResponse(ClusterName clusterName, NodeZooKeeperStatusResponse[] nodes) {
@@ -50,7 +52,23 @@ public class NodesZooKeeperStatusResponse extends NodesOperationResponse<NodesZo
         }
     }
 
-    public static class NodeZooKeeperStatusResponse extends NodeOperationResponse {
+    @Override
+    public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
+        builder.field("cluster_name", getClusterNameAsString());
+
+        builder.startObject("nodes");
+        for (NodesZooKeeperStatusResponse.NodeZooKeeperStatusResponse nodeInfo : nodes) {
+            builder.startObject(nodeInfo.getNode().id(), XContentBuilder.FieldCaseConversion.NONE);
+            nodeInfo.toXContent(builder, params);
+            builder.endObject();
+        }
+        builder.endObject();
+
+
+        return builder;
+    }
+
+    public static class NodeZooKeeperStatusResponse extends NodeOperationResponse implements ToXContent {
 
         boolean enabled = false;
 
@@ -89,6 +107,15 @@ public class NodesZooKeeperStatusResponse extends NodesOperationResponse<NodesZo
             NodeZooKeeperStatusResponse res = new NodeZooKeeperStatusResponse();
             res.readFrom(in);
             return res;
+        }
+
+        @Override
+        public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
+            builder.field("name", getNode().name());
+            builder.field("enabled", enabled());
+            builder.field("connected", connected());
+
+            return builder;
         }
     }
 }

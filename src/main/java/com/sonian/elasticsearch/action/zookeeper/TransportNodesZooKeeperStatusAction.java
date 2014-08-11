@@ -45,22 +45,18 @@ public class TransportNodesZooKeeperStatusAction extends
                 NodesZooKeeperStatusResponse.NodeZooKeeperStatusResponse> {
     private final ZooKeeperDiscovery zooKeeperDiscovery;
 
+    private static final String ACTION_NAME = "/zookeeper/settings/get";
 
     @Inject
     public TransportNodesZooKeeperStatusAction(Settings settings, ClusterName clusterName, ThreadPool threadPool,
                                                 ClusterService clusterService, TransportService transportService,
                                                 Discovery discovery) {
-        super(settings, clusterName, threadPool, clusterService, transportService);
+        super(settings, ACTION_NAME, clusterName, threadPool, clusterService, transportService);
         if(discovery instanceof ZooKeeperDiscovery) {
             zooKeeperDiscovery = (ZooKeeperDiscovery) discovery;
         } else {
             zooKeeperDiscovery = null;
         }
-    }
-
-    @Override
-    protected String transportAction() {
-        return "/zookeeper/settings/get";
     }
 
     @Override

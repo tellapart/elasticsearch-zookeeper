@@ -20,6 +20,7 @@ import com.sonian.elasticsearch.action.zookeeper.NodesZooKeeperStatusRequest;
 import com.sonian.elasticsearch.action.zookeeper.NodesZooKeeperStatusResponse;
 import com.sonian.elasticsearch.action.zookeeper.TransportNodesZooKeeperStatusAction;
 import org.elasticsearch.action.ActionListener;
+import org.elasticsearch.action.admin.cluster.node.stats.NodesStatsResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.inject.Inject;
@@ -28,6 +29,8 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.rest.*;
 import org.elasticsearch.rest.action.support.RestBuilderListener;
+import org.elasticsearch.rest.action.support.RestToXContentListener;
+
 
 import java.io.IOException;
 
@@ -46,28 +49,14 @@ public class RestZooKeeperStatusAction extends BaseRestHandler {
     }
 
     @Override
-    public void handleRequest(final RestRequest request, final RestChannel channel) {
+    public void handleRequest(final RestRequest request, final RestChannel channel, final Client client) {
         String[] nodesIds = Strings.splitStringByCommaToArray(request.param("nodeId"));
         NodesZooKeeperStatusRequest zooKeeperStatusRequest = new NodesZooKeeperStatusRequest(nodesIds);
         zooKeeperStatusRequest.zooKeeperTimeout(request.paramAsTime("timeout", TimeValue.timeValueSeconds(10)));
         transportNodesZooKeeperStatusAction.execute(zooKeeperStatusRequest, new RestBuilderListener<NodesZooKeeperStatusResponse>(channel) {
             @Override
             public RestResponse buildResponse(NodesZooKeeperStatusResponse result, XContentBuilder builder) throws Exception {
-                builder.startObject();
-                builder.field("cluster_name", result.getClusterNameAsString());
-
-                builder.startObject("nodes");
-                for (NodesZooKeeperStatusResponse.NodeZooKeeperStatusResponse nodeInfo : result) {
-                  builder.startObject(nodeInfo.getNode().id());
-                  builder.field("name", nodeInfo.getNode().name());
-                  builder.field("enabled", nodeInfo.enabled());
-                  builder.field("connected", nodeInfo.connected());
-                  builder.endObject();
-                }
-                builder.endObject();
-
-                builder.endObject();
-                return new BytesRestResponse(RestStatus.OK, builder);
+                return new BytesRestResponse(RestStatus.OK, result.toXContent(builder, null));
             }
         });
     }
