@@ -215,13 +215,27 @@ public class ZooKeeperDiscoveryTests extends AbstractZooKeeperNodeTests {
         buildNode("node2");
 
         // Ensure node1 is master
-        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1");
+        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1", new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node1").start();
+        ClusterState cs  = nodeMonitor.await();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
         // Start all other nodes
-        ClusterStateMonitor clientMonitor = new ClusterStateMonitor("client");
-        nodeMonitor = new ClusterStateMonitor("node2");
+        ClusterStateMonitor clientMonitor = new ClusterStateMonitor("client", new ClusterStateCondition() {
+            @Override
+            public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
+        nodeMonitor = new ClusterStateMonitor("node2", new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node2").start();
         node("client").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
@@ -280,7 +294,11 @@ public class ZooKeeperDiscoveryTests extends AbstractZooKeeperNodeTests {
         buildNode("node1");
 
         // Ensure node1 is master
-        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1");
+        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1",  new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node1").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
@@ -298,12 +316,20 @@ public class ZooKeeperDiscoveryTests extends AbstractZooKeeperNodeTests {
         buildNode("node2");
 
         // Ensure node1 is master
-        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1");
+        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1", new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node1").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
         // Wait for the second node to start
-        nodeMonitor = new ClusterStateMonitor("node2");
+        nodeMonitor = new ClusterStateMonitor("node2", new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node2").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
@@ -324,12 +350,20 @@ public class ZooKeeperDiscoveryTests extends AbstractZooKeeperNodeTests {
         buildNode("node2");
 
         // Ensure node1 is master
-        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1");
+        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1",  new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node1").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
         // Wait for the second node to start
-        nodeMonitor = new ClusterStateMonitor("node2");
+        nodeMonitor = new ClusterStateMonitor("node2",  new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node2").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
@@ -368,17 +402,29 @@ public class ZooKeeperDiscoveryTests extends AbstractZooKeeperNodeTests {
         );
 
         // Ensure node1 is master
-        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1");
+        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1",  new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node1").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
         // Wait for the second node to start
-        nodeMonitor = new ClusterStateMonitor("node2");
+        nodeMonitor = new ClusterStateMonitor("node2",  new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node2").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
         // Wait for the third node to start
-        nodeMonitor = new ClusterStateMonitor("node3");
+        nodeMonitor = new ClusterStateMonitor("node3",  new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node3").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
@@ -531,17 +577,29 @@ public class ZooKeeperDiscoveryTests extends AbstractZooKeeperNodeTests {
         );
 
         // Ensure node1 is master
-        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1");
+        ClusterStateMonitor nodeMonitor = new ClusterStateMonitor("node1",  new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node1").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
         // Wait for the second node to start
-        nodeMonitor = new ClusterStateMonitor("node2");
+        nodeMonitor = new ClusterStateMonitor("node2",  new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node2").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
         // Wait for the third node to start
-        nodeMonitor = new ClusterStateMonitor("node3");
+        nodeMonitor = new ClusterStateMonitor("node3",  new ClusterStateCondition() {
+            @Override public boolean check(ClusterChangedEvent event) {
+                return event.state().nodes().masterNode() != null;
+            }
+        });
         node("node3").start();
         assertThat(nodeMonitor.await().nodes().masterNode().name(), equalTo("node1"));
 
@@ -636,8 +694,8 @@ public class ZooKeeperDiscoveryTests extends AbstractZooKeeperNodeTests {
             clusterStateListener = new ClusterStateListener() {
                 @Override public void clusterChanged(ClusterChangedEvent event) {
                     if (checkCondition(event)) {
-                        logger.info("clusterChangedEvent {} state {} ", event.source(), state);
                         state = event.state();
+                        logger.info("clusterChangedEvent {} state {} ", event.source(), state);
                         clusterService(id).remove(this);
                         latchNode.countDown();
                     } else {
