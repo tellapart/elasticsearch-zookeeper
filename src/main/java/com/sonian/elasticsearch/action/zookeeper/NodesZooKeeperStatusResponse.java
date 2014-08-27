@@ -54,6 +54,7 @@ public class NodesZooKeeperStatusResponse extends NodesOperationResponse<NodesZo
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
+        builder.startObject();
         builder.field("cluster_name", getClusterNameAsString());
 
         builder.startObject("nodes");
@@ -62,6 +63,7 @@ public class NodesZooKeeperStatusResponse extends NodesOperationResponse<NodesZo
             nodeInfo.toXContent(builder, params);
             builder.endObject();
         }
+        builder.endObject();
         builder.endObject();
 
 
