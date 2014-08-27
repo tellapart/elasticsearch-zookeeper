@@ -92,7 +92,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
     }
 
     @Test
-    public void testClusterStatePublishingWithNewVersion() throws Exception {
+    public void testClusterStatePublishingWithDifferentRevision() throws Exception {
         RoutingTable routingTable = testRoutingTable();
         DiscoveryNodes nodes = testDiscoveryNodes();
         ClusterState initialState = testClusterState(routingTable, nodes);
@@ -107,14 +107,41 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
 
         ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, "0.0.2");
 
+        try {
+            zkStateNew.start();
+            assertThat("Should read the state stored by the same minor version", true);
+        } catch (ZooKeeperIncompatibleStateVersionException ex)
+        {
+            assertThat("Should read the state stored by the same minor version", false);
+        }
+
+        zkStateNew.stop();
+    }
+
+    @Test
+    public void testClusterStatePublishingWithNewVersion() throws Exception {
+        RoutingTable routingTable = testRoutingTable();
+        DiscoveryNodes nodes = testDiscoveryNodes();
+        ClusterState initialState = testClusterState(routingTable, nodes);
+
+        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, "0.1.0");
+
+        zkStateOld.start();
+
+        zkStateOld.publish(initialState, new NoOpAckListener());
+
+        zkStateOld.stop();
+
+        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, "0.2.0");
+
         zkStateNew.start();
 
         try {
             zkStateNew.retrieve(null);
             assertThat("Shouldn't read the state stored by a different version", false);
         } catch (ZooKeeperIncompatibleStateVersionException ex) {
-            assertThat(ex.getMessage(), containsString("0.0.1"));
-            assertThat(ex.getMessage(), containsString("0.0.2"));
+            assertThat(ex.getMessage(), containsString("0.1"));
+            assertThat(ex.getMessage(), containsString("0.2"));
         }
         ZooKeeperClient zk = buildZooKeeper();
 
