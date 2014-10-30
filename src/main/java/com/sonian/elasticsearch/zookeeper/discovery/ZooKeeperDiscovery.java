@@ -117,7 +117,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         if (componentSettings.getAsBoolean("state_publishing.enabled", false)) {
             statePublisher = new ZooKeeperStatePublisher(settings, environment, zooKeeperClient, this);
         } else {
-            statePublisher = new ZenStatePublisher(settings, transportService, this, new NewClusterStateListener(), discoverySettings);
+            statePublisher = new ZenStatePublisher(settings, transportService, this, new NewClusterStateListener(), discoverySettings, clusterName);
         }
     }
 
@@ -696,8 +696,8 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         private final PublishClusterStateAction publishClusterState;
 
         public ZenStatePublisher(Settings settings, TransportService transportService, DiscoveryNodesProvider nodesProvider,
-                                 NewClusterStateListener listener, DiscoverySettings discoverySettings) {
-            publishClusterState = new PublishClusterStateAction(settings, transportService, nodesProvider, listener, discoverySettings);
+                                 NewClusterStateListener listener, DiscoverySettings discoverySettings, ClusterName clusterName) {
+            publishClusterState = new PublishClusterStateAction(settings, transportService, nodesProvider, listener, discoverySettings, clusterName);
         }
 
         @Override public void start() {
