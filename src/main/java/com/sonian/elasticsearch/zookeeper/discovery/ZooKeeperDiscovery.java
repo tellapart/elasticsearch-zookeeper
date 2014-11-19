@@ -56,6 +56,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static org.elasticsearch.discovery.DiscoverySettings.NO_MASTER_BLOCK_ALL;
+
 /**
  * @author imotov
  */
@@ -350,7 +352,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
             public ClusterState execute(ClusterState currentState) {
                 MetaData metaData = currentState.metaData();
                 RoutingTable routingTable = currentState.routingTable();
-                ClusterBlocks clusterBlocks = ClusterBlocks.builder().blocks(currentState.blocks()).addGlobalBlock(NO_MASTER_BLOCK).build();
+                ClusterBlocks clusterBlocks = ClusterBlocks.builder().blocks(currentState.blocks()).addGlobalBlock(NO_MASTER_BLOCK_ALL).build();
                 // if this is a data node, clean the metadata and routing, since we want to recreate the indices and shards
                 if (currentState.nodes().localNode() != null && currentState.nodes().localNode().dataNode()) {
                     metaData = MetaData.builder().build();
@@ -400,7 +402,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
                 // update the fact that we are the master...
                 builder.localNodeId(localNode.id()).masterNodeId(localNode.id());
                 latestDiscoNodes = builder.build();
-                ClusterBlocks clusterBlocks = ClusterBlocks.builder().blocks(currentState.blocks()).removeGlobalBlock(NO_MASTER_BLOCK).build();
+                ClusterBlocks clusterBlocks = ClusterBlocks.builder().blocks(currentState.blocks()).removeGlobalBlock(NO_MASTER_BLOCK_ALL).build();
                 return ClusterState.builder(currentState).nodes(latestDiscoNodes).blocks(clusterBlocks).build();
             }
 

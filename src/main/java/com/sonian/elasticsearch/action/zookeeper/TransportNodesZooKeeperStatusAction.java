@@ -18,6 +18,7 @@ package com.sonian.elasticsearch.action.zookeeper;
 
 import com.sonian.elasticsearch.zookeeper.discovery.ZooKeeperDiscovery;
 import org.elasticsearch.ElasticsearchException;
+import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.nodes.NodeOperationRequest;
 import org.elasticsearch.action.support.nodes.TransportNodesOperationAction;
 import org.elasticsearch.cluster.ClusterName;
@@ -50,8 +51,8 @@ public class TransportNodesZooKeeperStatusAction extends
     @Inject
     public TransportNodesZooKeeperStatusAction(Settings settings, ClusterName clusterName, ThreadPool threadPool,
                                                 ClusterService clusterService, TransportService transportService,
-                                                Discovery discovery) {
-        super(settings, ACTION_NAME, clusterName, threadPool, clusterService, transportService);
+                                                Discovery discovery, ActionFilters actionFilters) {
+        super(settings, ACTION_NAME, clusterName, threadPool, clusterService, transportService, actionFilters);
         if(discovery instanceof ZooKeeperDiscovery) {
             zooKeeperDiscovery = (ZooKeeperDiscovery) discovery;
         } else {

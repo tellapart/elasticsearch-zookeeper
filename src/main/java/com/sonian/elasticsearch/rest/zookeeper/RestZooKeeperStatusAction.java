@@ -19,8 +19,6 @@ package com.sonian.elasticsearch.rest.zookeeper;
 import com.sonian.elasticsearch.action.zookeeper.NodesZooKeeperStatusRequest;
 import com.sonian.elasticsearch.action.zookeeper.NodesZooKeeperStatusResponse;
 import com.sonian.elasticsearch.action.zookeeper.TransportNodesZooKeeperStatusAction;
-import org.elasticsearch.action.ActionListener;
-import org.elasticsearch.action.admin.cluster.node.stats.NodesStatsResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.inject.Inject;
@@ -29,10 +27,6 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.rest.*;
 import org.elasticsearch.rest.action.support.RestBuilderListener;
-import org.elasticsearch.rest.action.support.RestToXContentListener;
-
-
-import java.io.IOException;
 
 /**
  */
@@ -42,7 +36,7 @@ public class RestZooKeeperStatusAction extends BaseRestHandler {
 
     @Inject
     public RestZooKeeperStatusAction(Settings settings, Client client, RestController controller, TransportNodesZooKeeperStatusAction transportNodesZooKeeperStatusAction) {
-        super(settings, client);
+        super(settings, controller, client);
         controller.registerHandler(RestRequest.Method.GET, "/_zookeeper/status", this);
         controller.registerHandler(RestRequest.Method.GET, "/_zookeeper/status/{nodeId}", this);
         this.transportNodesZooKeeperStatusAction = transportNodesZooKeeperStatusAction;
