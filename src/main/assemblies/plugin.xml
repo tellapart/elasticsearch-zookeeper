@@ -2,9 +2,9 @@
 <assembly>
     <id>plugin</id>
     <formats>
-        <format>tar</format>
+        <format>zip</format>
     </formats>
-    <includeBaseDirectory>true</includeBaseDirectory>
+    <includeBaseDirectory>false</includeBaseDirectory>
     <dependencySets>
         <dependencySet>
             <outputDirectory>/</outputDirectory>
