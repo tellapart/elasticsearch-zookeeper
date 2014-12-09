@@ -97,7 +97,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
         DiscoveryNodes nodes = testDiscoveryNodes();
         ClusterState initialState = testClusterState(routingTable, nodes);
 
-        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, "0.0.1");
+        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, "1.1.0");
 
         zkStateOld.start();
 
@@ -105,10 +105,12 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
 
         zkStateOld.stop();
 
-        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, "0.0.2");
+        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, "1.3.1");
+
+        zkStateNew.start();
 
         try {
-            zkStateNew.start();
+            zkStateNew.retrieve(null);
             assertThat("Should read the state stored by the same minor version", true);
         } catch (ZooKeeperIncompatibleStateVersionException ex)
         {
@@ -132,7 +134,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
 
         zkStateOld.stop();
 
-        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, "0.2.0");
+        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, "1.2.0");
 
         zkStateNew.start();
 
@@ -140,8 +142,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
             zkStateNew.retrieve(null);
             assertThat("Shouldn't read the state stored by a different version", false);
         } catch (ZooKeeperIncompatibleStateVersionException ex) {
-            assertThat(ex.getMessage(), containsString("0.1"));
-            assertThat(ex.getMessage(), containsString("0.2"));
+            assertThat(ex.getMessage(), is("Expected: 1.2.0, actual: 0.1.0"));
         }
         ZooKeeperClient zk = buildZooKeeper();
 

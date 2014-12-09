@@ -166,12 +166,14 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
                 return null;
             }
             final BytesStreamInput buf = new BytesStreamInput(stateBuf, false);
-            String clusterStateVersion = buf.readString();
-            while (clusterStateVersion.indexOf('.') < clusterStateVersion.lastIndexOf('.')) {
-                clusterStateVersion = clusterStateVersion.substring(0, clusterStateVersion.lastIndexOf('.'));
+            String version = buf.readString();
+            String majorVersion = version;
+            int i = majorVersion.indexOf('.');
+            if(i >= 0) {
+                majorVersion = i == 0? "0" : majorVersion.substring(0, i);
             }
-            if (!clusterStateVersion().equals(clusterStateVersion)) {
-                throw new ZooKeeperIncompatibleStateVersionException("Expected: " + clusterStateVersion() + ", actual: " + clusterStateVersion);
+            if (!clusterStateVersion().startsWith(majorVersion)) {
+                throw new ZooKeeperIncompatibleStateVersionException("Expected: " + clusterStateVersion() + ", actual: " + version);
             }
 
             ClusterState.Builder builder = ClusterState.builder(clusterName).version(buf.readLong());
