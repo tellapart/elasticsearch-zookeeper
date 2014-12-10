@@ -29,6 +29,7 @@ import org.elasticsearch.cluster.node.DiscoveryNodeService;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.RoutingTable;
 import org.elasticsearch.cluster.routing.allocation.AllocationService;
+import org.elasticsearch.common.Priority;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.collect.Sets;
 import org.elasticsearch.common.component.AbstractLifecycleComponent;
@@ -347,7 +348,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     }
 
     private void removeMaster() {
-        clusterService.submitStateUpdateTask("zoo-keeper-disco-no-master (no_master_found)", new ProcessedClusterStateUpdateTask() {
+        clusterService.submitStateUpdateTask("zoo-keeper-disco-no-master (no_master_found)", Priority.IMMEDIATE, new ProcessedClusterStateUpdateTask() {
             @Override
             public ClusterState execute(ClusterState currentState) {
                 MetaData metaData = currentState.metaData();
@@ -392,7 +393,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         logger.trace("Elected as master ({})", localNode.id());
         this.master = true;
         statePublisher.becomeMaster();
-        clusterService.submitStateUpdateTask("zoo-keeper-disco-join (elected_as_master)", new ProcessedClusterStateUpdateTask() {
+        clusterService.submitStateUpdateTask("zoo-keeper-disco-join (elected_as_master)", Priority.IMMEDIATE, new ProcessedClusterStateUpdateTask() {
             @Override public ClusterState execute(ClusterState currentState) {
                 DiscoveryNodes.Builder builder = DiscoveryNodes.builder(currentState.nodes());
                 // Make sure that the current node is present
@@ -439,7 +440,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     }
 
     private void updateNodeList(final Set<String> nodes) {
-        clusterService.submitStateUpdateTask("zoo-keeper-disco-update-node-list", new ClusterStateUpdateTask() {
+        clusterService.submitStateUpdateTask("zoo-keeper-disco-update-node-list", Priority.URGENT, new ClusterStateUpdateTask() {
             @Override
             public ClusterState execute(ClusterState currentState) {
                 try {
@@ -505,7 +506,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         if (!master) {
             // Make sure that we are part of the state
             if (clusterState.nodes().localNode() != null) {
-                clusterService.submitStateUpdateTask("zoo-keeper-disco-receive(from master [" + clusterState.nodes().masterNode() + "])", new ProcessedClusterStateUpdateTask() {
+                clusterService.submitStateUpdateTask("zoo-keeper-disco-receive(from master [" + clusterState.nodes().masterNode() + "])", Priority.URGENT, new ProcessedClusterStateUpdateTask() {
                     @Override public ClusterState execute(ClusterState currentState) {
                         latestDiscoNodes = clusterState.nodes();
                         return clusterState;
