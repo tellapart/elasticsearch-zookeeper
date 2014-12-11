@@ -127,9 +127,9 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     @Override protected void doStart() throws ElasticsearchException {
         // note, we rely on the fact that its a new id each time we start, see FD and "kill -9" handling
         String nodeId = Strings.randomBase64UUID();
-        localNode = new DiscoveryNode(settings.get("name"), nodeId, transportService.boundAddress().publishAddress(), discoveryNodeService.buildAttributes(), Version.CURRENT);
+        localNode = clusterService.localNode();
         localNodePath = nodePath(localNode.id());
-        latestDiscoNodes = new DiscoveryNodes.Builder().put(localNode).localNodeId(localNode.id()).build();
+        latestDiscoNodes = clusterService.state().nodes();
         initialStateSent.set(false);
         zooKeeperClient.addSessionStateListener(sessionResetListener);
         zooKeeperClient.start();
@@ -228,7 +228,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
             return latestNodes;
         }
         // have not decided yet, just send the local node
-        return DiscoveryNodes.builder().put(localNode).localNodeId(localNode.id()).build();
+        return clusterService.state().nodes();
     }
 
     @Override
@@ -348,7 +348,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     }
 
     private void removeMaster() {
-        clusterService.submitStateUpdateTask("zoo-keeper-disco-no-master (no_master_found)", Priority.IMMEDIATE, new ProcessedClusterStateUpdateTask() {
+        clusterService.submitStateUpdateTask("zoo-keeper-disco-no-master (no_master_found)", Priority.IMMEDIATE, new ProcessedClusterStateNonMasterUpdateTask() {
             @Override
             public ClusterState execute(ClusterState currentState) {
                 MetaData metaData = currentState.metaData();
@@ -393,7 +393,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         logger.trace("Elected as master ({})", localNode.id());
         this.master = true;
         statePublisher.becomeMaster();
-        clusterService.submitStateUpdateTask("zoo-keeper-disco-join (elected_as_master)", Priority.IMMEDIATE, new ProcessedClusterStateUpdateTask() {
+        clusterService.submitStateUpdateTask("zoo-keeper-disco-join (elected_as_master)", Priority.IMMEDIATE, new ProcessedClusterStateNonMasterUpdateTask() {
             @Override public ClusterState execute(ClusterState currentState) {
                 DiscoveryNodes.Builder builder = DiscoveryNodes.builder(currentState.nodes());
                 // Make sure that the current node is present
@@ -440,7 +440,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     }
 
     private void updateNodeList(final Set<String> nodes) {
-        clusterService.submitStateUpdateTask("zoo-keeper-disco-update-node-list", Priority.URGENT, new ClusterStateUpdateTask() {
+        clusterService.submitStateUpdateTask("zoo-keeper-disco-update-node-list", Priority.IMMEDIATE, new ClusterStateNonMasterUpdateTask() {
             @Override
             public ClusterState execute(ClusterState currentState) {
                 try {
@@ -506,7 +506,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         if (!master) {
             // Make sure that we are part of the state
             if (clusterState.nodes().localNode() != null) {
-                clusterService.submitStateUpdateTask("zoo-keeper-disco-receive(from master [" + clusterState.nodes().masterNode() + "])", Priority.URGENT, new ProcessedClusterStateUpdateTask() {
+                clusterService.submitStateUpdateTask("zoo-keeper-disco-receive(from master [" + clusterState.nodes().masterNode() + "])", Priority.IMMEDIATE, new ProcessedClusterStateNonMasterUpdateTask() {
                     @Override public ClusterState execute(ClusterState currentState) {
                         latestDiscoNodes = clusterState.nodes();
                         return clusterState;
