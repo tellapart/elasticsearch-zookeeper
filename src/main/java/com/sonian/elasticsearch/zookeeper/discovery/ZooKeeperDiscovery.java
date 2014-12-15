@@ -29,6 +29,7 @@ import org.elasticsearch.cluster.node.DiscoveryNodeService;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.RoutingTable;
 import org.elasticsearch.cluster.routing.allocation.AllocationService;
+import org.elasticsearch.common.Priority;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.collect.Sets;
 import org.elasticsearch.common.component.AbstractLifecycleComponent;
@@ -55,6 +56,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import static org.elasticsearch.discovery.DiscoverySettings.NO_MASTER_BLOCK_ALL;
 
 /**
  * @author imotov
@@ -124,9 +127,9 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     @Override protected void doStart() throws ElasticsearchException {
         // note, we rely on the fact that its a new id each time we start, see FD and "kill -9" handling
         String nodeId = Strings.randomBase64UUID();
-        localNode = new DiscoveryNode(settings.get("name"), nodeId, transportService.boundAddress().publishAddress(), discoveryNodeService.buildAttributes(), Version.CURRENT);
+        localNode = clusterService.localNode();
         localNodePath = nodePath(localNode.id());
-        latestDiscoNodes = new DiscoveryNodes.Builder().put(localNode).localNodeId(localNode.id()).build();
+        latestDiscoNodes = clusterService.state().nodes();
         initialStateSent.set(false);
         zooKeeperClient.addSessionStateListener(sessionResetListener);
         zooKeeperClient.start();
@@ -225,7 +228,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
             return latestNodes;
         }
         // have not decided yet, just send the local node
-        return DiscoveryNodes.builder().put(localNode).localNodeId(localNode.id()).build();
+        return clusterService.state().nodes();
     }
 
     @Override
@@ -345,12 +348,12 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     }
 
     private void removeMaster() {
-        clusterService.submitStateUpdateTask("zoo-keeper-disco-no-master (no_master_found)", new ProcessedClusterStateUpdateTask() {
+        clusterService.submitStateUpdateTask("zoo-keeper-disco-no-master (no_master_found)", Priority.IMMEDIATE, new ProcessedClusterStateNonMasterUpdateTask() {
             @Override
             public ClusterState execute(ClusterState currentState) {
                 MetaData metaData = currentState.metaData();
                 RoutingTable routingTable = currentState.routingTable();
-                ClusterBlocks clusterBlocks = ClusterBlocks.builder().blocks(currentState.blocks()).addGlobalBlock(NO_MASTER_BLOCK).build();
+                ClusterBlocks clusterBlocks = ClusterBlocks.builder().blocks(currentState.blocks()).addGlobalBlock(NO_MASTER_BLOCK_ALL).build();
                 // if this is a data node, clean the metadata and routing, since we want to recreate the indices and shards
                 if (currentState.nodes().localNode() != null && currentState.nodes().localNode().dataNode()) {
                     metaData = MetaData.builder().build();
@@ -390,7 +393,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         logger.trace("Elected as master ({})", localNode.id());
         this.master = true;
         statePublisher.becomeMaster();
-        clusterService.submitStateUpdateTask("zoo-keeper-disco-join (elected_as_master)", new ProcessedClusterStateUpdateTask() {
+        clusterService.submitStateUpdateTask("zoo-keeper-disco-join (elected_as_master)", Priority.IMMEDIATE, new ProcessedClusterStateNonMasterUpdateTask() {
             @Override public ClusterState execute(ClusterState currentState) {
                 DiscoveryNodes.Builder builder = DiscoveryNodes.builder(currentState.nodes());
                 // Make sure that the current node is present
@@ -400,7 +403,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
                 // update the fact that we are the master...
                 builder.localNodeId(localNode.id()).masterNodeId(localNode.id());
                 latestDiscoNodes = builder.build();
-                ClusterBlocks clusterBlocks = ClusterBlocks.builder().blocks(currentState.blocks()).removeGlobalBlock(NO_MASTER_BLOCK).build();
+                ClusterBlocks clusterBlocks = ClusterBlocks.builder().blocks(currentState.blocks()).removeGlobalBlock(NO_MASTER_BLOCK_ALL).build();
                 return ClusterState.builder(currentState).nodes(latestDiscoNodes).blocks(clusterBlocks).build();
             }
 
@@ -437,7 +440,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     }
 
     private void updateNodeList(final Set<String> nodes) {
-        clusterService.submitStateUpdateTask("zoo-keeper-disco-update-node-list", new ClusterStateUpdateTask() {
+        clusterService.submitStateUpdateTask("zoo-keeper-disco-update-node-list", Priority.IMMEDIATE, new ClusterStateNonMasterUpdateTask() {
             @Override
             public ClusterState execute(ClusterState currentState) {
                 try {
@@ -503,7 +506,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         if (!master) {
             // Make sure that we are part of the state
             if (clusterState.nodes().localNode() != null) {
-                clusterService.submitStateUpdateTask("zoo-keeper-disco-receive(from master [" + clusterState.nodes().masterNode() + "])", new ProcessedClusterStateUpdateTask() {
+                clusterService.submitStateUpdateTask("zoo-keeper-disco-receive(from master [" + clusterState.nodes().masterNode() + "])", Priority.IMMEDIATE, new ProcessedClusterStateNonMasterUpdateTask() {
                     @Override public ClusterState execute(ClusterState currentState) {
                         latestDiscoNodes = clusterState.nodes();
                         return clusterState;
