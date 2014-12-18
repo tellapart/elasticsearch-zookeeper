@@ -18,6 +18,8 @@ package com.sonian.elasticsearch.zookeeper.discovery;
 
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperClient;
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperIncompatibleStateVersionException;
+
+import org.elasticsearch.Version;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.*;
@@ -92,12 +94,12 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
     }
 
     @Test
-    public void testClusterStatePublishingWithDifferentRevision() throws Exception {
+    public void testClusterStatePublishingWithDifferentMinorVersion() throws Exception {
         RoutingTable routingTable = testRoutingTable();
         DiscoveryNodes nodes = testDiscoveryNodes();
         ClusterState initialState = testClusterState(routingTable, nodes);
 
-        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, "1.1.0");
+        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, Version.V_1_1_0);
 
         zkStateOld.start();
 
@@ -105,7 +107,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
 
         zkStateOld.stop();
 
-        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, "1.3.1");
+        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, Version.V_1_3_1);
 
         zkStateNew.start();
 
@@ -126,7 +128,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
         DiscoveryNodes nodes = testDiscoveryNodes();
         ClusterState initialState = testClusterState(routingTable, nodes);
 
-        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, "0.1.0");
+        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, Version.V_0_18_0);
 
         zkStateOld.start();
 
@@ -134,7 +136,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
 
         zkStateOld.stop();
 
-        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, "1.2.0");
+        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, Version.V_1_2_0);
 
         zkStateNew.start();
 
@@ -142,7 +144,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
             zkStateNew.retrieve(null);
             assertThat("Shouldn't read the state stored by a different version", false);
         } catch (ZooKeeperIncompatibleStateVersionException ex) {
-            assertThat(ex.getMessage(), is("Expected: 1.2.0, actual: 0.1.0"));
+            assertThat(ex.getMessage(), is("Local version: 1.2.0 incompatible with remote version: 0.18.0"));
         }
         ZooKeeperClient zk = buildZooKeeper();
 
@@ -158,4 +160,43 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
 
     }
 
+    @Test
+    public void testReadOldPluginClusterState() throws Exception {
+        // ensure we can read state from versions of plugin between 1.3.1 and version serialization change
+        testReadOldPluginClusterState("1.1");
+    }
+
+    @Test
+    public void testReadOlderPluginClusterState() throws Exception {
+        // ensure we can read state from pre-1.3.1 versions of this plugin
+        testReadOldPluginClusterState("1.1.0");
+    }
+
+    public void testReadOldPluginClusterState(String version) throws Exception {
+        RoutingTable routingTable = testRoutingTable();
+        DiscoveryNodes nodes = testDiscoveryNodes();
+        ClusterState initialState = testClusterState(routingTable, nodes);
+
+        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, version);
+
+        zkStateOld.start();
+
+        zkStateOld.publish(initialState, new NoOpAckListener());
+
+        zkStateOld.stop();
+
+        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, Version.V_1_4_1);
+
+        zkStateNew.start();
+
+        try {
+            zkStateNew.retrieve(null);
+            assertThat("Should read the state stored by the same minor version", true);
+        } catch (ZooKeeperIncompatibleStateVersionException ex)
+        {
+            assertThat("Should read the state stored by the same minor version", false);
+        }
+
+        zkStateNew.stop();
+    }
 }

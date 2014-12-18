@@ -65,8 +65,6 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
 
     private final ClusterName clusterName;
 
-    private final String clusterStateVersion = new StringBuilder().append(Version.CURRENT.major).append('.').append(Version.CURRENT.minor).toString();
-
     private volatile boolean watching = true;
 
     public ZooKeeperClusterState(Settings settings, ZooKeeperEnvironment environment, ZooKeeperClient zooKeeperClient, DiscoveryNodesProvider nodesProvider, ClusterName clusterName) {
@@ -101,7 +99,7 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             zooKeeperClient.createPersistentNode(environment.stateNodePath());
             final String statePath = environment.statePartsNodePath();
             final BytesStreamOutput buf = new BytesStreamOutput();
-            buf.writeString(clusterStateVersion());
+            writeVersion(buf);
             buf.writeLong(state.version());
             for (ClusterStatePart<?> part : this.parts) {
                 buf.writeString(part.publishClusterStatePart(state));
@@ -166,14 +164,22 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
                 return null;
             }
             final BytesStreamInput buf = new BytesStreamInput(stateBuf, false);
-            String version = buf.readString();
-            String majorVersion = version;
-            int i = majorVersion.indexOf('.');
-            if(i >= 0) {
-                majorVersion = i == 0? "0" : majorVersion.substring(0, i);
+            Version storedVersion;
+            try {
+                storedVersion = Version.readVersion(buf);
+                if (storedVersion.major == 0 && storedVersion.minor == 0) {
+                    storedVersion = readStringVersion(buf);
+                }
+            } catch (IOException e) {
+                storedVersion = readStringVersion(buf);
             }
-            if (!clusterStateVersion().startsWith(majorVersion)) {
-                throw new ZooKeeperIncompatibleStateVersionException("Expected: " + clusterStateVersion() + ", actual: " + version);
+            buf.setVersion(storedVersion);
+            if (!storedVersion.equals(clusterStateVersion()) && !Version
+                    .largest(clusterStateVersion(), storedVersion).minimumCompatibilityVersion()
+                    .onOrBefore(Version.smallest(clusterStateVersion(), storedVersion))) {
+                throw new ZooKeeperIncompatibleStateVersionException(
+                        "Local version: " + clusterStateVersion()
+                                + " incompatible with remote version: " + storedVersion);
             }
 
             ClusterState.Builder builder = ClusterState.builder(clusterName).version(buf.readLong());
@@ -191,6 +197,24 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             publishingLock.unlock();
         }
 
+    }
+
+    /**
+     * For backwards compatibility on upgrade read version serialized by old versions of this plugin,
+     * which were in the form Version.number() or, for plugin versions 1.3.1+,
+     * (Version.CURRENT.major).append('.').append(Version.CURRENT.minor)
+     * @param buf
+     * @return
+     */
+    private Version readStringVersion(StreamInput buf) throws IOException {
+        buf.reset();
+        String versionStr = buf.readString();
+        try {
+            return Version.fromString(versionStr);
+        } catch (IllegalArgumentException ee) {
+            //approximate exact version for upgrade from state which only had version in form Major.Minor
+            return Version.fromString(versionStr + ".0");
+        }
     }
 
     /**
@@ -244,10 +268,13 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
     protected void doClose() throws ElasticsearchException {
     }
 
-    protected String clusterStateVersion() {
-        return clusterStateVersion;
+    protected Version clusterStateVersion() {
+        return Version.CURRENT;
     }
 
+    protected void writeVersion(StreamOutput out) throws IOException {
+        Version.writeVersion(clusterStateVersion(), out);
+    }
 
     public interface NewClusterStateListener {
         public void onNewClusterState(ClusterState clusterState);
