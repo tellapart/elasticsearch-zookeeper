@@ -221,14 +221,21 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
         zk.setOrCreatePersistentNode(statePath + "/parts", buf.bytes().copyBytesArray().toBytes());
         zk.stop();
 
-        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(testDiscoveryNodes());
-        zkStateNew.start();
+        ZooKeeperClusterState zkState = buildZooKeeperClusterState(testDiscoveryNodes());
+        zkState.start();
 
-        ClusterState state = zkStateNew.retrieve(null);
+        ClusterState state = zkState.retrieve(null);
         assertThat(state.getRoutingTable(), notNullValue());
         assertThat(state.getMetaData().getCustoms().get("repositories"), notNullValue());
 
-        zkStateNew.stop();
-    }
+        // check that state was serialized correctly with new version
+        zkState.publish(state, new NoOpAckListener());
+        zkState.stop();
 
+        ZooKeeperClusterState zkStateUpdated = buildZooKeeperClusterState(testDiscoveryNodes());
+        zkStateUpdated.start();
+        state = zkStateUpdated.retrieve(null);
+        assertThat(state.getMetaData().getCustoms().get("repositories"), notNullValue());
+        zkStateUpdated.stop();
+    }
 }

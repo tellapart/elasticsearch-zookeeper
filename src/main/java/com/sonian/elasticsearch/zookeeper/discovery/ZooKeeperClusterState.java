@@ -164,27 +164,27 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
                 return null;
             }
             final BytesStreamInput buf = new BytesStreamInput(stateBuf, false);
-            Version storedVersion;
+            Version stateVersion;
             try {
-                storedVersion = Version.readVersion(buf);
-                if (storedVersion.major == 0 && storedVersion.minor == 0) {
-                    storedVersion = readStringVersion(buf);
+                stateVersion = Version.readVersion(buf);
+                if (stateVersion.major == 0 && stateVersion.minor == 0) {
+                    stateVersion = readStringVersion(buf);
                 }
             } catch (IOException e) {
-                storedVersion = readStringVersion(buf);
+                stateVersion = readStringVersion(buf);
             }
-            buf.setVersion(storedVersion);
-            if (!storedVersion.equals(clusterStateVersion()) && !Version
-                    .largest(clusterStateVersion(), storedVersion).minimumCompatibilityVersion()
-                    .onOrBefore(Version.smallest(clusterStateVersion(), storedVersion))) {
+            buf.setVersion(stateVersion);
+            if (!stateVersion.equals(localVersion()) && !Version
+                    .largest(localVersion(), stateVersion).minimumCompatibilityVersion()
+                    .onOrBefore(Version.smallest(localVersion(), stateVersion))) {
                 throw new ZooKeeperIncompatibleStateVersionException(
-                        "Local version: " + clusterStateVersion()
-                                + " incompatible with remote version: " + storedVersion);
+                        "Local version: " + localVersion()
+                                + " incompatible with remote version: " + stateVersion);
             }
 
             ClusterState.Builder builder = ClusterState.builder(clusterName).version(buf.readLong());
             for (ClusterStatePart<?> part : this.parts) {
-                builder = part.set(builder, buf.readString(), storedVersion);
+                builder = part.set(builder, buf.readString(), stateVersion);
                 if (builder == null) {
                     return null;
                 }
@@ -268,12 +268,12 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
     protected void doClose() throws ElasticsearchException {
     }
 
-    protected Version clusterStateVersion() {
+    protected Version localVersion() {
         return Version.CURRENT;
     }
 
     protected void writeVersion(StreamOutput out) throws IOException {
-        Version.writeVersion(clusterStateVersion(), out);
+        Version.writeVersion(localVersion(), out);
     }
 
     public interface NewClusterStateListener {
@@ -378,19 +378,22 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
 
         private String previousPath;
 
+        private Version cachedVersion;
+
         public ClusterStatePart(String statePartName) {
             this.statePartName = statePartName;
         }
 
         public String publishClusterStatePart(ClusterState state) throws ElasticsearchException, InterruptedException {
             T statePart = get(state);
-            if (statePart.equals(cached)) {
+            if (statePart.equals(cached) && localVersion().equals(cachedVersion)) {
                 return cachedPath;
             } else {
                 String path = internalPublishClusterStatePart(statePart);
                 cached = statePart;
                 previousPath = cachedPath;
                 cachedPath = path;
+                cachedVersion = localVersion();
                 return path;
             }
         }
@@ -417,6 +420,7 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
                 if (part != null) {
                     cached = part;
                     cachedPath = path;
+                    cachedVersion = version;
                     return cached;
                 } else {
                     return null;

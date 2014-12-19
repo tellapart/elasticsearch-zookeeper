@@ -253,7 +253,7 @@ public abstract class AbstractZooKeeperTests {
         }
 
         @Override
-        protected Version clusterStateVersion() {
+        protected Version localVersion() {
             return clusterStateVersion;
         }
     }
