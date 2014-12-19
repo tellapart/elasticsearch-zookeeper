@@ -184,7 +184,7 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
 
             ClusterState.Builder builder = ClusterState.builder(clusterName).version(buf.readLong());
             for (ClusterStatePart<?> part : this.parts) {
-                builder = part.set(builder, buf.readString());
+                builder = part.set(builder, buf.readString(), storedVersion);
                 if (builder == null) {
                     return null;
                 }
@@ -409,11 +409,11 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             return rootPath;
         }
 
-        public T getClusterStatePart(String path) throws ElasticsearchException, InterruptedException {
+        public T getClusterStatePart(String path, Version version) throws ElasticsearchException, InterruptedException {
             if (path.equals(cachedPath)) {
                 return cached;
             } else {
-                T part = internalGetStatePart(path);
+                T part = internalGetStatePart(path, version);
                 if (part != null) {
                     cached = part;
                     cachedPath = path;
@@ -437,12 +437,14 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             }
         }
 
-        public T internalGetStatePart(final String path) throws ElasticsearchException, InterruptedException {
+        public T internalGetStatePart(final String path, Version version) throws ElasticsearchException, InterruptedException {
             try {
 
                 byte[] buf = zooKeeperClient.getLargeNode(path);
                 if (buf != null) {
-                    return readFrom(new BytesStreamInput(buf, false));
+                    StreamInput in = new BytesStreamInput(buf, false);
+                    in.setVersion(version);
+                    return readFrom(in);
                 } else {
                     return null;
                 }
@@ -451,8 +453,8 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             }
         }
 
-        public ClusterState.Builder set(ClusterState.Builder builder, String path) throws ElasticsearchException, InterruptedException {
-            T val = getClusterStatePart(path);
+        public ClusterState.Builder set(ClusterState.Builder builder, String path, Version version) throws ElasticsearchException, InterruptedException {
+            T val = getClusterStatePart(path, version);
             if (val == null) {
                 return null;
             } else {

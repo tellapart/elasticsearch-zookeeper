@@ -62,7 +62,7 @@ public abstract class AbstractZooKeeperTests {
 
     private Settings defaultSettings = ImmutableSettings
             .settingsBuilder()
-            .put("cluster.name", "test-cluster-" + NetworkUtils.getLocalAddress().getHostName())
+            .put("cluster.name", "test-cluster-local")
             .build();
 
     private ZooKeeperEnvironment environment;

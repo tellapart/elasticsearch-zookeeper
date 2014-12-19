@@ -23,11 +23,14 @@ import org.elasticsearch.Version;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.*;
+import org.elasticsearch.common.io.ByteStreams;
+import org.elasticsearch.common.io.stream.BytesStreamOutput;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -199,4 +202,33 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
 
         zkStateNew.stop();
     }
+
+    @Test
+    public void testReadOldClusterState() throws Exception {
+        ZooKeeperClient zk = buildZooKeeper();
+        zk.start();
+        String statePath = "/es/clusters/test-cluster-local/state";
+        zk.createPersistentNode(statePath);
+        final BytesStreamOutput buf = new BytesStreamOutput();
+        buf.setVersion(Version.V_1_1_0);
+        buf.writeString(Version.V_1_1_0.number());
+        buf.writeLong(1234);
+        for (String part : Arrays.asList("routingTable", "discoveryNodes", "metadata", "clusterBlocks")) {
+            String path = zk.createLargeSequentialNode(statePath + "/" + part + "_",
+                    ByteStreams.toByteArray(getClass().getResourceAsStream(part)));
+            buf.writeString(path);
+        }
+        zk.setOrCreatePersistentNode(statePath + "/parts", buf.bytes().copyBytesArray().toBytes());
+        zk.stop();
+
+        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(testDiscoveryNodes());
+        zkStateNew.start();
+
+        ClusterState state = zkStateNew.retrieve(null);
+        assertThat(state.getRoutingTable(), notNullValue());
+        assertThat(state.getMetaData().getCustoms().get("repositories"), notNullValue());
+
+        zkStateNew.stop();
+    }
+
 }
