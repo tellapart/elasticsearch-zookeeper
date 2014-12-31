@@ -65,8 +65,6 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
 
     private final ClusterName clusterName;
 
-    private final String clusterStateVersion = new StringBuilder().append(Version.CURRENT.major).append('.').append(Version.CURRENT.minor).toString();
-
     private volatile boolean watching = true;
 
     public ZooKeeperClusterState(Settings settings, ZooKeeperEnvironment environment, ZooKeeperClient zooKeeperClient, DiscoveryNodesProvider nodesProvider, ClusterName clusterName) {
@@ -101,7 +99,7 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             zooKeeperClient.createPersistentNode(environment.stateNodePath());
             final String statePath = environment.statePartsNodePath();
             final BytesStreamOutput buf = new BytesStreamOutput();
-            buf.writeString(clusterStateVersion());
+            writeVersion(buf);
             buf.writeLong(state.version());
             for (ClusterStatePart<?> part : this.parts) {
                 buf.writeString(part.publishClusterStatePart(state));
@@ -166,17 +164,27 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
                 return null;
             }
             final BytesStreamInput buf = new BytesStreamInput(stateBuf, false);
-            String clusterStateVersion = buf.readString();
-            while (clusterStateVersion.indexOf('.') < clusterStateVersion.lastIndexOf('.')) {
-                clusterStateVersion = clusterStateVersion.substring(0, clusterStateVersion.lastIndexOf('.'));
+            Version stateVersion;
+            try {
+                stateVersion = Version.readVersion(buf);
+                if (stateVersion.major == 0 && stateVersion.minor == 0) {
+                    stateVersion = readStringVersion(buf);
+                }
+            } catch (IOException e) {
+                stateVersion = readStringVersion(buf);
             }
-            if (!clusterStateVersion().equals(clusterStateVersion)) {
-                throw new ZooKeeperIncompatibleStateVersionException("Expected: " + clusterStateVersion() + ", actual: " + clusterStateVersion);
+            buf.setVersion(stateVersion);
+            if (!stateVersion.equals(localVersion()) && !Version
+                    .largest(localVersion(), stateVersion).minimumCompatibilityVersion()
+                    .onOrBefore(Version.smallest(localVersion(), stateVersion))) {
+                throw new ZooKeeperIncompatibleStateVersionException(
+                        "Local version: " + localVersion()
+                                + " incompatible with remote version: " + stateVersion);
             }
 
             ClusterState.Builder builder = ClusterState.builder(clusterName).version(buf.readLong());
             for (ClusterStatePart<?> part : this.parts) {
-                builder = part.set(builder, buf.readString());
+                builder = part.set(builder, buf.readString(), stateVersion);
                 if (builder == null) {
                     return null;
                 }
@@ -189,6 +197,24 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             publishingLock.unlock();
         }
 
+    }
+
+    /**
+     * For backwards compatibility on upgrade read version serialized by old versions of this plugin,
+     * which were in the form Version.number() or, for plugin versions 1.3.1+,
+     * (Version.CURRENT.major).append('.').append(Version.CURRENT.minor)
+     * @param buf
+     * @return
+     */
+    private Version readStringVersion(StreamInput buf) throws IOException {
+        buf.reset();
+        String versionStr = buf.readString();
+        try {
+            return Version.fromString(versionStr);
+        } catch (IllegalArgumentException ee) {
+            //approximate exact version for upgrade from state which only had version in form Major.Minor
+            return Version.fromString(versionStr + ".0");
+        }
     }
 
     /**
@@ -242,10 +268,13 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
     protected void doClose() throws ElasticsearchException {
     }
 
-    protected String clusterStateVersion() {
-        return clusterStateVersion;
+    protected Version localVersion() {
+        return Version.CURRENT;
     }
 
+    protected void writeVersion(StreamOutput out) throws IOException {
+        Version.writeVersion(localVersion(), out);
+    }
 
     public interface NewClusterStateListener {
         public void onNewClusterState(ClusterState clusterState);
@@ -349,19 +378,22 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
 
         private String previousPath;
 
+        private Version cachedVersion;
+
         public ClusterStatePart(String statePartName) {
             this.statePartName = statePartName;
         }
 
         public String publishClusterStatePart(ClusterState state) throws ElasticsearchException, InterruptedException {
             T statePart = get(state);
-            if (statePart.equals(cached)) {
+            if (statePart.equals(cached) && localVersion().equals(cachedVersion)) {
                 return cachedPath;
             } else {
                 String path = internalPublishClusterStatePart(statePart);
                 cached = statePart;
                 previousPath = cachedPath;
                 cachedPath = path;
+                cachedVersion = localVersion();
                 return path;
             }
         }
@@ -380,14 +412,15 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             return rootPath;
         }
 
-        public T getClusterStatePart(String path) throws ElasticsearchException, InterruptedException {
+        public T getClusterStatePart(String path, Version version) throws ElasticsearchException, InterruptedException {
             if (path.equals(cachedPath)) {
                 return cached;
             } else {
-                T part = internalGetStatePart(path);
+                T part = internalGetStatePart(path, version);
                 if (part != null) {
                     cached = part;
                     cachedPath = path;
+                    cachedVersion = version;
                     return cached;
                 } else {
                     return null;
@@ -408,12 +441,14 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             }
         }
 
-        public T internalGetStatePart(final String path) throws ElasticsearchException, InterruptedException {
+        public T internalGetStatePart(final String path, Version version) throws ElasticsearchException, InterruptedException {
             try {
 
                 byte[] buf = zooKeeperClient.getLargeNode(path);
                 if (buf != null) {
-                    return readFrom(new BytesStreamInput(buf, false));
+                    StreamInput in = new BytesStreamInput(buf, false);
+                    in.setVersion(version);
+                    return readFrom(in);
                 } else {
                     return null;
                 }
@@ -422,8 +457,8 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             }
         }
 
-        public ClusterState.Builder set(ClusterState.Builder builder, String path) throws ElasticsearchException, InterruptedException {
-            T val = getClusterStatePart(path);
+        public ClusterState.Builder set(ClusterState.Builder builder, String path, Version version) throws ElasticsearchException, InterruptedException {
+            T val = getClusterStatePart(path, version);
             if (val == null) {
                 return null;
             } else {

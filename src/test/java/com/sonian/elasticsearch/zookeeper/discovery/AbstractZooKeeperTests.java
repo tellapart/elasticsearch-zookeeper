@@ -21,12 +21,15 @@ import com.sonian.elasticsearch.zookeeper.client.ZooKeeperClientService;
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperEnvironment;
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperFactory;
 import com.sonian.elasticsearch.zookeeper.discovery.embedded.EmbeddedZooKeeperService;
+
+import org.elasticsearch.Version;
 import org.elasticsearch.cluster.ClusterName;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.*;
 import org.elasticsearch.common.Nullable;
+import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
 import org.elasticsearch.common.network.NetworkUtils;
@@ -59,7 +62,7 @@ public abstract class AbstractZooKeeperTests {
 
     private Settings defaultSettings = ImmutableSettings
             .settingsBuilder()
-            .put("cluster.name", "test-cluster-" + NetworkUtils.getLocalAddress().getHostName())
+            .put("cluster.name", "test-cluster-local")
             .build();
 
     private ZooKeeperEnvironment environment;
@@ -207,11 +210,25 @@ public abstract class AbstractZooKeeperTests {
     }
 
     protected ZooKeeperClusterState buildZooKeeperClusterState(DiscoveryNodes nodes) {
-        return buildZooKeeperClusterState(nodes, null);
+        return new ZooKeeperClusterState(defaultSettings(),
+                zooKeeperEnvironment(),
+                buildZooKeeper(defaultSettings()),
+                getNodesProvider(nodes),
+                ClusterName.clusterNameFromSettings(defaultSettings));
+    }
+
+    protected ZooKeeperClusterState buildZooKeeperClusterState(final DiscoveryNodes nodes, Version clusterStateVersion) {
+        return new ZooKeeperClusterStateVersionOverride(clusterStateVersion, defaultSettings(),
+                zooKeeperEnvironment(), buildZooKeeper(defaultSettings), getNodesProvider(nodes));
     }
 
     protected ZooKeeperClusterState buildZooKeeperClusterState(final DiscoveryNodes nodes, String clusterStateVersion) {
-        DiscoveryNodesProvider provider = new DiscoveryNodesProvider() {
+        return new ZookeeperClusterStateWriteVersionOverride(clusterStateVersion, defaultSettings(),
+                zooKeeperEnvironment(), buildZooKeeper(defaultSettings), getNodesProvider(nodes));
+    }
+
+    private DiscoveryNodesProvider getNodesProvider(final DiscoveryNodes nodes) {
+        return new DiscoveryNodesProvider() {
             @Override
             public DiscoveryNodes nodes() {
                 return nodes;
@@ -222,27 +239,13 @@ public abstract class AbstractZooKeeperTests {
                 return null;
             }
         };
-        ZooKeeperClient zk = buildZooKeeper(defaultSettings());
-        if (clusterStateVersion != null) {
-            return new ZooKeeperClusterStateVersionOverride(clusterStateVersion, defaultSettings(), zooKeeperEnvironment(),
-                    zk,
-                    provider
-            );
-        } else {
-            return new ZooKeeperClusterState(defaultSettings(),
-                    zooKeeperEnvironment(),
-                    zk,
-                    provider,
-                    ClusterName.clusterNameFromSettings(defaultSettings)
-            );
-        }
     }
 
     private class ZooKeeperClusterStateVersionOverride extends ZooKeeperClusterState {
 
-        private final String clusterStateVersion;
+        private final Version clusterStateVersion;
 
-        public ZooKeeperClusterStateVersionOverride(String clusterStateVersion, Settings settings,
+        public ZooKeeperClusterStateVersionOverride(Version clusterStateVersion, Settings settings,
                                                     ZooKeeperEnvironment environment, ZooKeeperClient zooKeeperClient,
                                                     DiscoveryNodesProvider nodesProvider) {
             super(settings, environment, zooKeeperClient, nodesProvider, ClusterName.clusterNameFromSettings(defaultSettings));
@@ -250,11 +253,28 @@ public abstract class AbstractZooKeeperTests {
         }
 
         @Override
-        protected String clusterStateVersion() {
+        protected Version localVersion() {
             return clusterStateVersion;
         }
     }
 
+    private class ZookeeperClusterStateWriteVersionOverride extends ZooKeeperClusterState {
+        private final String clusterStateVersion;
+
+        public ZookeeperClusterStateWriteVersionOverride(String clusterStateVersion,
+                                                         Settings settings, ZooKeeperEnvironment environment,
+                                                         ZooKeeperClient zooKeeperClient,
+                                                         DiscoveryNodesProvider nodesProvider) {
+            super(settings, environment, zooKeeperClient, nodesProvider, ClusterName.clusterNameFromSettings(defaultSettings));
+            this.clusterStateVersion = clusterStateVersion;
+        }
+
+        @Override
+        protected void writeVersion(StreamOutput out) throws IOException {
+            // write version in format previously used by plugin
+            out.writeString(clusterStateVersion);
+        }
+    }
 
     protected static class NoOpAckListener implements Discovery.AckListener {
         @Override

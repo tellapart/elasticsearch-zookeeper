@@ -17,6 +17,8 @@
 package com.sonian.elasticsearch.zookeeper.discovery;
 
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperClient;
+
+import org.elasticsearch.Version;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthStatus;
 import org.elasticsearch.action.count.CountResponse;
@@ -256,7 +258,7 @@ public class ZooKeeperDiscoveryTests extends AbstractZooKeeperNodeTests {
         RoutingTable routingTable = testRoutingTable();
         DiscoveryNodes nodes = testDiscoveryNodes();
         ClusterState initialState = testClusterState(routingTable, nodes);
-        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, "0.0.1");
+        ZooKeeperClusterState zkStateOld = buildZooKeeperClusterState(nodes, Version.V_0_18_0);
         zkStateOld.start();
         zkStateOld.publish(initialState, new NoOpAckListener());
         zkStateOld.stop();
