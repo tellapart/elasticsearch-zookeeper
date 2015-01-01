@@ -213,7 +213,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
         buf.setVersion(Version.V_1_1_0);
         buf.writeString(Version.V_1_1_0.number());
         buf.writeLong(1234);
-        for (String part : Arrays.asList("routingTable", "discoveryNodes", "metadata", "clusterBlocks")) {
+        for (String part : Arrays.asList("routingTable", "discoveryNodes", "metaData", "clusterBlocks")) {
             String path = zk.createLargeSequentialNode(statePath + "/" + part + "_",
                     ByteStreams.toByteArray(getClass().getResourceAsStream(part)));
             buf.writeString(path);
