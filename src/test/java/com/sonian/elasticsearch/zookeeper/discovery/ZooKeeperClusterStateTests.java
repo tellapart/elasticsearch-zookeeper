@@ -166,16 +166,16 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
     @Test
     public void testReadOldPluginClusterState() throws Exception {
         // ensure we can read state from versions of plugin between 1.3.1 and version serialization change
-        testReadOldPluginClusterState("1.1");
+        testReadOldPluginClusterState(Version.V_1_4_0);
     }
 
     @Test
     public void testReadOlderPluginClusterState() throws Exception {
         // ensure we can read state from pre-1.3.1 versions of this plugin
-        testReadOldPluginClusterState("1.1.0");
+        testReadOldPluginClusterState(Version.V_1_0_1);
     }
 
-    public void testReadOldPluginClusterState(String version) throws Exception {
+    public void testReadOldPluginClusterState(Version version) throws Exception {
         RoutingTable routingTable = testRoutingTable();
         DiscoveryNodes nodes = testDiscoveryNodes();
         ClusterState initialState = testClusterState(routingTable, nodes);
@@ -188,7 +188,7 @@ public class ZooKeeperClusterStateTests extends AbstractZooKeeperTests {
 
         zkStateOld.stop();
 
-        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, Version.V_1_4_1);
+        ZooKeeperClusterState zkStateNew = buildZooKeeperClusterState(nodes, Version.CURRENT);
 
         zkStateNew.start();
 

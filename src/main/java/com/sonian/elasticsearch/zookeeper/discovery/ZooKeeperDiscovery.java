@@ -16,17 +16,22 @@
 
 package com.sonian.elasticsearch.zookeeper.discovery;
 
+import com.sonian.elasticsearch.zookeeper.client.AbstractNodeListener;
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperClient;
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperClientSessionExpiredException;
 import com.sonian.elasticsearch.zookeeper.client.ZooKeeperEnvironment;
 import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.Version;
-import org.elasticsearch.cluster.*;
+import org.elasticsearch.cluster.ClusterName;
+import org.elasticsearch.cluster.ClusterService;
+import org.elasticsearch.cluster.ClusterState;
+import org.elasticsearch.cluster.ClusterStateNonMasterUpdateTask;
+import org.elasticsearch.cluster.ProcessedClusterStateNonMasterUpdateTask;
 import org.elasticsearch.cluster.block.ClusterBlocks;
 import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.node.DiscoveryNodeService;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
+import org.elasticsearch.cluster.routing.RoutingService;
 import org.elasticsearch.cluster.routing.RoutingTable;
 import org.elasticsearch.cluster.routing.allocation.AllocationService;
 import org.elasticsearch.common.Priority;
@@ -47,7 +52,6 @@ import org.elasticsearch.discovery.zen.publish.PublishClusterStateAction;
 import org.elasticsearch.node.service.NodeService;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.TransportService;
-import com.sonian.elasticsearch.zookeeper.client.AbstractNodeListener;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -67,6 +71,8 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     private final TransportService transportService;
 
     private final ClusterService clusterService;
+
+    private RoutingService routingService;
 
     private final ClusterName clusterName;
 
@@ -122,6 +128,10 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
         } else {
             statePublisher = new ZenStatePublisher(settings, transportService, this, new NewClusterStateListener(), discoverySettings, clusterName);
         }
+    }
+
+    public void setRoutingService(RoutingService routingService) {
+        this.routingService = routingService;
     }
 
     @Override protected void doStart() throws ElasticsearchException {
@@ -192,12 +202,6 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
     public void setNodeService(@Nullable NodeService nodeService) {
         this.nodeService = nodeService;
     }
-
-    @Override
-    public void setAllocationService(AllocationService allocationService) {
-        //TODO: Implement eager rerouting when node leaves the cluster
-    }
-
 
     @Override public void publish(ClusterState clusterState, AckListener ackListener) {
         if (!master) {
@@ -721,4 +725,7 @@ public class ZooKeeperDiscovery extends AbstractLifecycleComponent<Discovery> im
 
     }
 
+    public void setAllocationService(AllocationService allocationService) {
+
+    }
 }

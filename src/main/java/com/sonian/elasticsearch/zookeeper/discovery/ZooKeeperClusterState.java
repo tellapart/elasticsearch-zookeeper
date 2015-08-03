@@ -65,15 +65,24 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
 
     private final ClusterName clusterName;
 
+    private Version localVersion = Version.CURRENT;
+
     private volatile boolean watching = true;
 
     public ZooKeeperClusterState(Settings settings, ZooKeeperEnvironment environment, ZooKeeperClient zooKeeperClient, DiscoveryNodesProvider nodesProvider, ClusterName clusterName) {
+        this(settings, environment, zooKeeperClient, nodesProvider, clusterName, null);
+    }
+
+    public ZooKeeperClusterState(Settings settings, ZooKeeperEnvironment environment, ZooKeeperClient zooKeeperClient, DiscoveryNodesProvider nodesProvider, ClusterName clusterName, Version clusterStateVersion) {
         super(settings);
         this.zooKeeperClient = zooKeeperClient;
         this.environment = environment;
         this.nodesProvider = nodesProvider;
         this.clusterName = clusterName;
         initClusterStatePersistence();
+        if (null != clusterStateVersion) {
+            this.localVersion = clusterStateVersion;
+        }
     }
 
 
@@ -269,7 +278,7 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
     }
 
     protected Version localVersion() {
-        return Version.CURRENT;
+        return localVersion;
     }
 
     protected void writeVersion(StreamOutput out) throws IOException {
@@ -403,6 +412,7 @@ public class ZooKeeperClusterState extends AbstractLifecycleComponent<ZooKeeperC
             String rootPath;
             try {
                 BytesStreamOutput streamOutput = new BytesStreamOutput();
+                streamOutput.setVersion(localVersion());
                 writeTo(statePart, streamOutput);
                 // Create Root node with version and size of the state part
                 rootPath = zooKeeperClient.createLargeSequentialNode(path, streamOutput.bytes().copyBytesArray().toBytes());
